@@ -53,6 +53,16 @@
       <textarea id="text-val"></textarea>
     </div>
     <script>
+      const createUUID = () => {
+          let dt = new Date().getTime();
+          const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+              const r = (dt + Math.random()*16)%16 | 0;
+              dt = Math.floor(dt/16);
+              return (c=='x' ? r :(r&0x3|0x8)).toString(16);
+          });
+          return uuid.toUpperCase();
+      };
+
       const secondsToTimeString = (seconds) => {
           let newSeconds = seconds;
           let timeString = ((seconds < 3600) ? '' : ((Math.floor(seconds/3600)).toString() + ':'));
@@ -61,17 +71,6 @@
           newSeconds = newSeconds % 60;
           timeString = timeString + ((newSeconds < 1 && seconds == newSeconds) ? '0' : (newSeconds.toString().padStart(2, '0')));
           return timeString;
-      }
-
-      const workoutTextToSecondsText = (text) => {
-          const array = text.split("\n");
-          let workoutObject = {};
-          let retVal = '';
-          for(index in array) {
-              let line = array[index];
-              retVal += timeStringToSeconds(line) + '\n';
-          }
-          return retVal;
       }
 
       const timeStringToSeconds = (timeString) => {
@@ -96,6 +95,132 @@
               const executed = regularTime.exec(timeString);
               return parseInt(executed[1])*60 + parseInt(executed[2]);
           }
+      }
+
+      const workoutTextToSecondsText = (text) => {
+          const normalLine = /^.*(\d+)\s*x\s*(\d+)\s*on\s*(\d*\:\d\d)(.*)\s\s\s.*$/;
+          const bracketLine = /^.*\{(\d+)\s*x\s*(\d+)\s*on\s*(\d*\:\d\d)(.*)\s\s\s.*$/;
+          const roundLine = /^.*(\d+)\s*x\s*\{(\d+)\s*x\s*(\d+)\s*on\s*(\d*\:\d\d)(.*)\s\s\s.*$/;
+          const restLine = /^.*(\d+)\s*on\s*(\d*\:\d\d)(.*)(rest|Rest|REST)(.*)$/
+          const equalsLine = /=================/;
+          const daysOfWeek = /^.*(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday).*$/
+          const group = /^.*Senior.*$/;
+
+          let setNum = 1;
+
+          const array = text.split("\n");
+          let inRound = false;
+          let workoutObject = {
+              'sets': []
+          };
+          let set = {
+              'rounds' : 1,
+              'repeats' : [],
+              'name' : 'Workout #' + setNum
+          };
+          let repeat = {};
+          for(index in array) {
+              let line = array[index];
+              if (roundLine.test(line)) {
+                  roundLineExec = roundLine.exec(line);
+                  set['rounds'] = parseInt(roundLineExec[1]);
+                  set['repeats'].push({
+                      'count': parseInt(roundLineExec[2]),
+                      'distance': roundLineExec[3],
+                      'interval': timeStringToSeconds(roundLineExec[4]),
+                      'description': roundLineExec[5].trim()
+                  });
+                  inRound = true;
+              } else if (bracketLine.test(line)) {
+                  bracketLineExec = bracketLine.exec(line);
+                  set['repeats'].push({
+                      'count': parseInt(bracketLineExec[1]),
+                      'distance': bracketLineExec[2],
+                      'interval': timeStringToSeconds(bracketLineExec[3]),
+                      'description': bracketLineExec[4].trim()
+                  });
+              } else if (normalLine.test(line)) {
+                  normalLineExec = normalLine.exec(line);
+                  set['repeats'].push({
+                      'count': parseInt(normalLineExec[1]),
+                      'distance': normalLineExec[2],
+                      'interval': timeStringToSeconds(normalLineExec[3]),
+                      'description': normalLineExec[4].trim()
+                  });
+              } else if (restLine.test(line)) {
+                  restLineExec = restLine.exec(line);
+                  set['repeats'].push({
+                      'count': parseInt(restLineExec[1]),
+                      'distance' : 0,
+                      'interval' : timeStringToSeconds(restLineExec[2]),
+                      'description' : 'Rest'
+                  });
+              } else if (equalsLine.test(line)) {
+                  if (set['repeats'].length) {
+                      setNum += 1;
+                      workoutObject['sets'].push(set);
+                  }
+                  set = {
+                      'rounds' : 1,
+                      'repeats' : [],
+                      'name' : 'Set #' + setNum
+                  };
+              } else if (daysOfWeek.test(line)){
+                  workoutObject['name'] = line.trim();
+              } else if (group.test(line)) {
+                  workoutObject['group'] = line.trim();
+              }
+          }
+          if (set['repeats'].length) {
+              workoutObject['sets'].push(set);
+          }
+
+          let seconds = {
+              'packs' : []
+          }
+          let pack = {
+              '_type' : 'pack',
+              'name' : workoutObject['name'],
+              'items' : []
+          };
+          for (index in workoutObject['sets']) {
+              numSets = 0;
+              set = workoutObject['sets'][index];
+              item = {
+                  'identifier' : createUUID(),
+                  '_type' : 'cust',
+                  'soundScheme' : 1,
+                  'activity' : 0,
+                  'type' : 0,
+                  'overrun' : false,
+                  'name' : set['name'],
+                  'intervals' : []
+              }
+              for (var k = 0; k < set['rounds']; k++) {
+                  for (var l = 0; l < set['repeats'].length; l++) {
+                      let repeat = set['repeats'][l];
+                      for (var m = 0; m < repeat['count']; m++) {
+                          interval = {
+                              '_type' : 'int',
+                              'splitRest' : 0,
+                              'ducked' : false,
+                              'halfwayAlert' : false,
+                              'indefinite' : false,
+                              'rest' : false,
+                              'vibration' : false,
+                              'duration' : repeat['interval'],
+                              'name' : repeat['distance'] + ' ' + repeat['description']
+                          };
+                          item['intervals'].push(interval);
+                          numSets++;
+                      }
+                  }
+              }
+              item['numberOfSets'] = numSets;
+              pack['items'].push(item);
+          }
+          seconds['packs'].push(pack);
+          return JSON.stringify(seconds);
       }
 
       const download = (filename, text) => {
