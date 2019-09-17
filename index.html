@@ -98,10 +98,10 @@
       }
 
       const workoutTextToSecondsText = (text) => {
-          const normalLine = /^.*(\d+)\s*x\s*(\d+)\s*on\s*(\d*\:\d\d)(.*)\s\s\s.*$/;
+          const normalLine = /^.*\s(\d+)\s*x\s*(\d+)\s*on\s*(\d*\:\d\d)(.*)\s\s\s.*$/;
           const bracketLine = /^.*\{(\d+)\s*x\s*(\d+)\s*on\s*(\d*\:\d\d)(.*)\s\s\s.*$/;
-          const roundLine = /^.*(\d+)\s*x\s*\{(\d+)\s*x\s*(\d+)\s*on\s*(\d*\:\d\d)(.*)\s\s\s.*$/;
-          const restLine = /^.*(\d+)\s*on\s*(\d*\:\d\d)(.*)(rest|Rest|REST)(.*)$/
+          const roundLine = /^.*\s(\d+)\s*x\s*\{(\d+)\s*x\s*(\d+)\s*on\s*(\d*\:\d\d)(.*)\s\s\s.*$/;
+          const restLine = /^.*\s(\d+)\s*on\s*(\d*\:\d\d)(.*)(rest|Rest|REST)(.*)$/
           const equalsLine = /=================/;
           const daysOfWeek = /^.*(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday).*$/
           const group = /^.*Senior.*$/;
